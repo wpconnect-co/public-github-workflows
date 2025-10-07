@@ -1,0 +1,112 @@
+name: Deploy to WordPress.org
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        type: string
+        description: environment to deploy to
+        required: true
+      WPC_VERSION:
+        type: string
+        description: version to deploy
+        required: true
+      dry-run:
+        type: boolean
+        description: dry run
+        required: false
+        default: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    env:
+      WPC_REPO_URL: ${{github.server_url}}/${{ github.repository }}
+      WPC_VERSION: ${{ inputs.WPC_VERSION }}
+      WPC_PLUGIN_SLUG: ${{ vars.WPC_PLUGIN_SLUG }}
+      WPC_TAG_PREFIX: ${{ vars.WPC_TAG_PREFIX }}
+    steps:
+      - name: Check variables
+        run: |
+          echo "$WPC_REPO_URL/releases/download/$WPC_TAG_PREFIX$WPC_VERSION/$WPC_PLUGIN_SLUG.$WPC_VERSION.zip"
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Cache Composer dependencies
+        if: ${{ hashFiles('composer.json') != '' }}
+        uses: actions/cache@v3
+        with:
+          path: /tmp/composer-cache
+          key: ${{ runner.os }}-${{ hashFiles('composer.lock') }}
+      - name: Build
+        if: ${{ hashFiles('composer.json') != '' }}
+        uses: php-actions/composer@v6
+        with:
+          version: '2.2.x'
+          php_version: '7.0.33'
+      - name: WordPress Plugin Deploy
+        uses: 10up/action-wordpress-plugin-deploy@stable
+        with:
+          dry-run: ${{ inputs.dry-run }}
+        env:
+          SVN_PASSWORD: ${{ secrets.SVN_PASSWORD }}
+          SVN_USERNAME: ${{ secrets.SVN_USERNAME }}
+          SLUG: ${{ vars.WPC_PLUGIN_SLUG }}
+          VERSION: ${{ inputs.WPC_VERSION }}
+
+  success_notification:
+    if: ${{ success() }}
+    needs: deploy
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    env:
+      WPC_REPO_URL: ${{github.server_url}}/${{ github.repository }}
+    steps:
+      - name: Post success deploy notification to vars.SLACK_NOTIFICATION_CHANNEL_ID Slack channel
+        id: slack
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          channel-id: ${{ vars.SLACK_NOTIFICATION_CHANNEL_ID }}
+          payload: |
+            {
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": ":tada: ${{ vars.WPC_PLUGIN_NAME }} v${{ inputs.WPC_VERSION }}: deploy release on https://wordpress.org/plugins/${{ vars.WPC_PLUGIN_SLUG }}/ succeed (<${{ env.WPC_REPO_URL }}/releases/tag/${{ vars.WPC_TAG_PREFIX }}${{ inputs.WPC_VERSION }}|release>)"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+
+  failed_notification:
+    if: ${{ failure() }}
+    needs: deploy
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    env:
+      WPC_REPO_URL: ${{github.server_url}}/${{ github.repository }}
+    steps:
+      - name: Post failed deploy notification to a Slack channel
+        id: slack
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          channel-id: ${{ vars.SLACK_NOTIFICATION_CHANNEL_ID }}
+          payload: |
+            {
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": ":warning: ${{ vars.WPC_PLUGIN_NAME }} v${{ inputs.WPC_VERSION }}: deploy release on https://wordpress.org/plugins/${{ vars.WPC_PLUGIN_SLUG }}/ failed (<${{ env.WPC_REPO_URL }}/releases/tag/${{ vars.WPC_TAG_PREFIX }}${{ inputs.WPC_VERSION }}|release>)"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+

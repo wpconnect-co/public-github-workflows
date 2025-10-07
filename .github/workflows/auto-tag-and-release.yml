@@ -1,0 +1,94 @@
+name: Auto Tag and Release
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        type: string
+        description: environment to deploy to
+        required: true
+    outputs:
+      version:
+        description: "Plugin's version extracted from the release branch name"
+        value: ${{ jobs.auto-tag-and-release.outputs.version }}
+
+jobs:
+  auto-tag-and-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      WPC_PLUGIN_SLUG: ${{ vars.WPC_PLUGIN_SLUG }}
+      WPC_PLUGIN_NAME: ${{ vars.WPC_PLUGIN_NAME }}
+      WPC_TAG_PREFIX: ${{ vars.WPC_TAG_PREFIX }}
+    environment: ${{ inputs.environment }}
+    outputs:
+      version: ${{ steps.version_output.outputs.version }}
+    steps:
+      - name: Set WPC_VERSION
+        run: |
+          WPC_VERSION=${GITHUB_HEAD_REF##*/}
+          echo "WPC_VERSION=$(echo "$WPC_VERSION")" >> $GITHUB_ENV
+
+      - name: check WPC_VERSION
+        run: echo "$WPC_VERSION"
+
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Cache Composer dependencies
+        if: ${{ hashFiles('composer.json') != '' }}
+        uses: actions/cache@v3
+        with:
+          path: /tmp/composer-cache
+          key: ${{ runner.os }}-${{ hashFiles('composer.lock') }}
+      - name: Build
+        if: ${{ hashFiles('composer.json') != '' }}
+        uses: php-actions/composer@v6
+        with:
+          version: '2.2.x'
+          php_version: '7.0.33'
+      - name: changelog
+        run: |
+          mkdir dist
+          WPC_README=$(cat readme.txt)
+          echo "$WPC_README" > dist/readme.txt
+          WPC_CHANGELOG=$(awk '/== Changelog ==/{flag=1;next}/==/{flag=0}flag' <<< "$WPC_README")
+          echo "$WPC_CHANGELOG" > dist/changelog.txt
+          WPC_VERSION_CHANGELOG=$(awk '/= '$WPC_VERSION' =/{flag=1;next}/=/{flag=0}flag' <<< "$WPC_CHANGELOG")
+          echo "WPC_VERSION_CHANGELOG<<EOF" >> $GITHUB_ENV
+          echo "$WPC_VERSION_CHANGELOG" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+      - name: Install WP-CLI
+        shell: bash
+        run: |
+          curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
+          chmod +x wp-cli.phar
+          sudo mv wp-cli.phar /usr/local/bin/wp
+          wp package install wp-cli/dist-archive-command
+
+      - name: Build plugin archive
+        run: wp dist-archive ./ ./dist/$WPC_PLUGIN_SLUG.$WPC_VERSION.zip --create-target-dir --plugin-dirname=$WPC_PLUGIN_SLUG
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wpc_dist
+          path: dist/
+          include-hidden-files: true
+          overwrite: true
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: ${{ env.WPC_PLUGIN_NAME }} ${{ env.WPC_VERSION }}
+          body: ${{ env.WPC_VERSION_CHANGELOG }}
+          tag_name: ${{ env.WPC_TAG_PREFIX }}${{ env.WPC_VERSION }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fail_on_unmatched_files: true
+          files:
+            ./dist/${{ env.WPC_PLUGIN_SLUG }}.${{ env.WPC_VERSION }}.zip
+
+      - name: Output version
+        id: version_output
+        run: echo "version=$WPC_VERSION" >> "$GITHUB_OUTPUT"
+
