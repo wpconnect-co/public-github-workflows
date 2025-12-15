@@ -6,6 +6,7 @@ Requirements:
 - add .github/workflows folder to the plugin
 - add a new yml file in the folder (see template below)
 - create environment and add secrets / variables in the repository settings (see details below)
+- make sure changelog is hosted in changelog.txt and not in readme.txt
 
 ### To deploy plugin on WordPress.org
 #### Workflow templates
@@ -20,14 +21,14 @@ on:
 jobs:
   auto-tag-and-release:
     if: github.event.pull_request.merged == true && 'main' == github.event.pull_request.base.ref && startsWith(github.event.pull_request.head.ref, 'release/')
-    uses: wpconnect-co/public-github-workflows/.github/workflows/auto-tag-and-release.yml@v1.3
+    uses: wpconnect-co/public-github-workflows/.github/workflows/auto-tag-and-release.yml@v1.4
     permissions:
       contents: write
     with:
       environment: { plugin's environment name }
 
   deploy:
-    uses: wpconnect-co/public-github-workflows/.github/workflows/deploy-to-wordpress.yml@v1.3
+    uses: wpconnect-co/public-github-workflows/.github/workflows/deploy-to-wordpress.yml@v1.4
     needs: auto-tag-and-release
     secrets: inherit
     with:
