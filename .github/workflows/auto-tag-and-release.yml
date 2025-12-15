@@ -53,7 +53,6 @@ jobs:
           WPC_README=$(cat readme.txt)
           WPC_CHANGELOG=$(cat changelog.txt)
           echo "$WPC_README" > dist/readme.txt
-          WPC_CHANGELOG=$(awk '/== Changelog ==/{flag=1;next}/==/{flag=0}flag' <<< "$WPC_CHANGELOG")
           echo "$WPC_CHANGELOG" > dist/changelog.txt
           WPC_VERSION_CHANGELOG=$(awk '/= '$WPC_VERSION' =/{flag=1;next}/=/{flag=0}flag' <<< "$WPC_CHANGELOG")
           echo "WPC_VERSION_CHANGELOG<<EOF" >> $GITHUB_ENV
