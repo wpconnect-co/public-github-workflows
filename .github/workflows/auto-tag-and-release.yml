@@ -65,7 +65,7 @@ jobs:
           curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
           chmod +x wp-cli.phar
           sudo mv wp-cli.phar /usr/local/bin/wp
-          wp package install wp-cli/dist-archive-command@3.1.0
+          wp package install wp-cli/dist-archive-command:3.1.0
 
       - name: Build plugin archive
         run: wp dist-archive ./ ./dist/$WPC_PLUGIN_SLUG.$WPC_VERSION.zip --create-target-dir --plugin-dirname=$WPC_PLUGIN_SLUG
