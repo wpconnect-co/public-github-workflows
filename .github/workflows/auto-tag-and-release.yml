@@ -46,7 +46,7 @@ jobs:
         uses: php-actions/composer@v6
         with:
           version: '2.2.x'
-          php_version: '7.0.33'
+          php_version: '7.4.33'
       - name: changelog
         run: |
           mkdir dist
