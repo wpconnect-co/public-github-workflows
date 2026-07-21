@@ -34,10 +34,10 @@ jobs:
         run: echo "$WPC_VERSION"
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Cache Composer dependencies
         if: ${{ hashFiles('composer.json') != '' }}
-        uses: actions/cache@v3
+        uses: actions/cache@v6
         with:
           path: /tmp/composer-cache
           key: ${{ runner.os }}-${{ hashFiles('composer.lock') }}
@@ -70,7 +70,7 @@ jobs:
       - name: Build plugin archive
         run: wp dist-archive ./ ./dist/$WPC_PLUGIN_SLUG.$WPC_VERSION.zip --create-target-dir --plugin-dirname=$WPC_PLUGIN_SLUG
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: wpc_dist
           path: dist/
@@ -78,7 +78,7 @@ jobs:
           overwrite: true
 
       - name: Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v3
         with:
           name: ${{ env.WPC_PLUGIN_NAME }} ${{ env.WPC_VERSION }}
           body: ${{ env.WPC_VERSION_CHANGELOG }}
